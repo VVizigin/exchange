@@ -1,0 +1,14 @@
+<!-- templates/posts/index.html -->
+{% extends 'base.html' %}
+{% block title %}
+  Записи группы
+{% endblock %}
+
+{% block content %}
+  <h1>{{ group.title }}</h1>
+  <p>{{ group.description }}</p>
+  {% for post in page_obj %}
+    {% include "posts/post_info.html" with show_link=False %}
+  {% endfor %}
+  {% include 'posts/includes/paginator.html' %}
+{% endblock %}

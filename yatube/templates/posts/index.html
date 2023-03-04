@@ -1,0 +1,15 @@
+<!-- templates/posts/index.html -->
+{% extends 'base.html' %}
+
+{% block title %}
+  Главная страница YaTube
+{% endblock %}
+
+{% block content %}
+  <h1>Последние обновления на сайте</h1>
+  {% for post in page_obj %}
+    {% include "posts/post_info.html" with show_link=True %}
+  {% endfor %}
+  {% include 'posts/includes/paginator.html' %}
+{% endblock %}
+
