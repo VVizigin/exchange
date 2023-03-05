@@ -105,6 +105,7 @@ class PostTests(TestCase):
             with self.subTest(field=field):
                 form_field = response.context.get('form').fields.get(field)
                 self.assertIsInstance(form_field, expected)
+        self.assertEqual(response.context.get('is_edit'), True)
 
     def test_create_post_show_correct_context(self):
         """Шаблон создания поста create_post сформирован
@@ -120,6 +121,7 @@ class PostTests(TestCase):
             with self.subTest(field=field):
                 form_field = response.context.get('form').fields.get(field)
                 self.assertIsInstance(form_field, expected)
+        self.assertEqual(response.context.get('is_edit'), None)
 
     def test_create_post_show_home_group_list_profile_pages(self):
         """Созданный пост отобразился на главной, на странице группы,
@@ -135,9 +137,7 @@ class PostTests(TestCase):
         )
         for url in urls:
             response = self.authorized_client_author.get(url)
-            post_info = response.context.get('page_obj')[0]
-            # self.assertEqual(post_info, self.post)
-            self.assertIn(self.post, response.context['page_obj'], post_info)
+            self.assertIn(self.post, response.context['page_obj'])
 
     def test_post_not_another_group(self):
         """Созданный пост не попал в группу, для которой не был
@@ -151,14 +151,15 @@ class PostTests(TestCase):
             reverse('posts_app:group_list',
                     kwargs={'slug': another_group.slug})
         )
-        # self.assertEqual(len(response.context['page_obj']), 0)
         self.assertNotIn(self.post, response.context['page_obj'])
 
 
 class PaginatorViewsTest(TestCase):
     @classmethod
     def setUpClass(cls):
-        count_posts = 13
+        cls.count_posts = 13
+        cls.posts_per_first_page = 10
+        cls.posts_per_second_page = 3
         super().setUpClass()
         cls.author_user = User.objects.create_user(username='TestUserAuthor')
         cls.auth_user = User.objects.create_user(username='TestUserAuth')
@@ -173,14 +174,13 @@ class PaginatorViewsTest(TestCase):
                 text=f'Тестовый пост {i}',
                 group=cls.group,
             )
-            for i in range(count_posts)
+            for i in range(cls.count_posts)
         ]
         Post.objects.bulk_create(cls.posts)
 
     def test_first_page_contains_ten_records(self):
         """Проверяем количество постов на страницах Main, group_list, profile
         равно 10."""
-        posts_per_first_page = 10
         urls = (
             reverse('posts_app:main'),
             reverse('posts_app:group_list', kwargs={'slug': self.group.slug}),
@@ -192,11 +192,10 @@ class PaginatorViewsTest(TestCase):
         for url in urls:
             response = self.client.get(url)
             amount_posts = len(response.context.get('page_obj').object_list)
-            self.assertEqual(amount_posts, posts_per_first_page)
+            self.assertEqual(amount_posts, self.posts_per_first_page)
 
     def test_second_page_contains_three_records(self):
         """На страницах main, group_list, profile должно быть по три поста."""
-        posts_per_second_page = 3
         urls = (
             reverse('posts_app:main') + '?page=2',
             reverse(
@@ -210,4 +209,4 @@ class PaginatorViewsTest(TestCase):
         for url in urls:
             response = self.client.get(url)
             amount_posts = len(response.context.get('page_obj').object_list)
-            self.assertEqual(amount_posts, posts_per_second_page)
+            self.assertEqual(amount_posts, self.posts_per_second_page)

@@ -24,7 +24,6 @@ class PostCreateFormTests(TestCase):
             slug='test-slug',
             description='Тестовое описание',
         )
-        cls.form = PostForm()
         cls.form_text = 'Введенный в форму текст'
         cls.form_text_replace = 'Отредактированный в форме текст'
 
@@ -33,7 +32,7 @@ class PostCreateFormTests(TestCase):
         self.authorized_client.force_login(PostCreateFormTests.auth_user)
 
     def test_create_with_group_post(self):
-        """Валидная форма создает запись в Posts."""
+        """Валидная форма создает запись в Posts с группой."""
         post_count = Post.objects.count()
         form_data = {
             'text': self.form_text,
@@ -59,7 +58,7 @@ class PostCreateFormTests(TestCase):
         self.assertTrue(check_post.author, self.auth_user)
 
     def test_create_without_group_post(self):
-        """Валидная форма создает запись в Posts."""
+        """Валидная форма создает запись в Posts без группы."""
         post_count = Post.objects.count()
         form_data = {
             'text': self.form_text,
