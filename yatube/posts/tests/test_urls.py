@@ -96,15 +96,25 @@ class PostURLTests(TestCase):
 
     def test_urls_uses_correct_template(self):
         """Проверяем, что URL-адрес использует соответствующий шаблон."""
-        templates_url_names = {
-            'posts/index.html': '/',
-            'posts/group_list.html': f'/group/{self.group.slug}/',
-            'posts/profile.html': f'/profile/{self.author_user.username}/',
-            'posts/post_detail.html': f'/posts/{self.post.pk}/',
-            'posts/post_create.html': '/create/',
-            'posts/post_create.html': f'/posts/{self.post.pk}/edit/',
-        }
-        for template, address in templates_url_names.items():
-            with self.subTest(address=address):
-                response = self.authorized_client_author.get(address)
-                self.assertTemplateUsed(response, template)
+        templates_url_names = [
+            {
+                'template': 'posts/index.html',
+                'url': '/'
+            },
+            {'template': 'posts/group_list.html',
+                'url': f'/group/{self.group.slug}/'},
+            {'template': 'posts/group_list.html',
+             'url': f'/group/{self.group.slug}/'},
+            {'template': 'posts/profile.html',
+             'url': f'/profile/{self.author_user.username}/'},
+            {'template': 'posts/post_detail.html',
+             'url': f'/posts/{self.post.pk}/'},
+            {'template': 'posts/post_create.html',
+             'url': '/create/'},
+            {'template': 'posts/post_create.html',
+             'url': f'/posts/{self.post.pk}/edit/'},
+        ]
+        for item in templates_url_names:
+            with self.subTest(address=item['url']):
+                response = self.authorized_client_author.get(item['url'])
+                self.assertTemplateUsed(response, item['template'])

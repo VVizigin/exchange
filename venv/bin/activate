@@ -37,7 +37,7 @@ deactivate () {
 # unset irrelevant variables
 deactivate nondestructive
 
-VIRTUAL_ENV="/Users/Vlad/Desktop/Практикум пайтон/Dev/hw04_tests/venv"
+VIRTUAL_ENV="/Users/Vlad/Desktop/Практикум пайтон/exchange/venv"
 export VIRTUAL_ENV
 
 _OLD_VIRTUAL_PATH="$PATH"

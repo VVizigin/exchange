@@ -105,7 +105,7 @@ class PostTests(TestCase):
             with self.subTest(field=field):
                 form_field = response.context.get('form').fields.get(field)
                 self.assertIsInstance(form_field, expected)
-        self.assertEqual(response.context.get('is_edit'), True)
+        self.assertTrue(response.context.get('is_edit'))
 
     def test_create_post_show_correct_context(self):
         """Шаблон создания поста create_post сформирован
@@ -121,7 +121,7 @@ class PostTests(TestCase):
             with self.subTest(field=field):
                 form_field = response.context.get('form').fields.get(field)
                 self.assertIsInstance(form_field, expected)
-        self.assertEqual(response.context.get('is_edit'), None)
+        self.assertFalse(response.context.get('is_edit'))
 
     def test_create_post_show_home_group_list_profile_pages(self):
         """Созданный пост отобразился на главной, на странице группы,
