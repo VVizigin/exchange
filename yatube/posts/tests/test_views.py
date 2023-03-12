@@ -68,6 +68,8 @@ class PostTests(TestCase):
         response = self.authorized_client.get(url)
         post_info = response.context.get('page_obj')[0]
         self.assertEqual(post_info, self.post)
+        group_info = response.context.get('group')
+        self.assertEqual(group_info, self.group)
 
     def test_profile_page_show_correct_context(self):
         """Шаблон profile сформирован с правильным контекстом."""

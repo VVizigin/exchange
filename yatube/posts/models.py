@@ -2,6 +2,7 @@ from django.contrib.auth import get_user_model
 from django.db import models
 
 User = get_user_model()
+str_length = 15
 
 
 class Post(models.Model):
@@ -31,7 +32,6 @@ class Post(models.Model):
         help_text="Выбрать группу",
         verbose_name='Группа'
     )
-    str_length = 15
 
     class Meta:
         ordering = ('-pub_date',)
@@ -39,7 +39,7 @@ class Post(models.Model):
         verbose_name_plural = "Посты"
 
     def __str__(self):
-        return self.text[:self.str_length]
+        return self.text[:str_length]
 
 
 class Group(models.Model):
