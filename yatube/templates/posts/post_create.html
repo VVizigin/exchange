@@ -35,7 +35,7 @@
             {% endfor %}
           {% endif %}
 
-          <form method="post" action="{{ request.get_full_path }}">
+          <form method="post" enctype="multipart/form-data" action="{{ request.get_full_path }}">
             {% csrf_token %}
                   {# Выводим поля в цикле, по отдельности #}
             {% for field in form %}

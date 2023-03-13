@@ -2,7 +2,7 @@ from http import HTTPStatus
 
 from django.test import (
     Client,
-    TestCase
+    TestCase,
 )
 from django.urls import reverse
 
@@ -178,3 +178,4 @@ class PostCreateFormTests(TestCase):
         )
         check_post = Post.objects.get(pk=post.id)
         self.assertEqual(check_post, post)
+

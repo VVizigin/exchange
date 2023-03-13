@@ -46,6 +46,7 @@ INSTALLED_APPS = [
     'posts.apps.PostsConfig',
     'users.apps.UsersConfig',
     'core.apps.CoreConfig',
+    'sorl.thumbnail',
 ]
 
 MIDDLEWARE = [
@@ -131,9 +132,14 @@ LOGIN_REDIRECT_URL = 'posts_app:main'
 EMAIL_BACKEND = 'django.core.mail.backends.filebased.EmailBackend'
 EMAIL_FILE_PATH = os.path.join(BASE_DIR, 'sent_emails')
 
+CSRF_FAILURE_VIEW = 'core.views.csrf_failure'
+
 
 STATICFILES_DIRS = [os.path.join(BASE_DIR, 'static')]
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/2.2/howto/static-files/
 
 STATIC_URL = '/static/'
+
+MEDIA_URL = '/media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
