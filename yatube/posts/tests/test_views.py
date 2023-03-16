@@ -6,6 +6,7 @@ from django.conf import settings
 from django.test import Client, TestCase, override_settings
 from django.urls import reverse
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.core.cache import cache
 
 from ..models import Group, Post, User
 
@@ -58,6 +59,7 @@ class PostTests(TestCase):
 
     def test_pages_uses_correct_template(self):
         """Проверяем, что URL-адрес использует соответствующий шаблон."""
+        cache.clear()
         page_names_templates = {
             reverse('posts_app:main'): 'posts/index.html',
             reverse(
@@ -83,11 +85,10 @@ class PostTests(TestCase):
 
     def test_home_page_show_correct_context(self):
         """Шаблон главной страницы сформирован с правильным контекстом."""
+        cache.clear()
         response = self.authorized_client.get(reverse('posts_app:main'))
         post_info = response.context.get('page_obj')[0]
-        post_image = response.context.get('posts/small.gif')
         self.assertEqual(post_info, self.post)
-        self.assertEqual(post_image, self.post.image)
 
     def test_group_list_page_show_correct_context(self):
         """Шаблон group_list сформирован с правильным контекстом."""
@@ -158,6 +159,7 @@ class PostTests(TestCase):
         """Созданный пост отобразился на главной, на странице группы,
         в профиле пользователя.
         """
+        cache.clear()
         urls = (
             reverse('posts_app:main'),
             reverse('posts_app:group_list', kwargs={'slug': self.group.slug}),
@@ -183,6 +185,25 @@ class PostTests(TestCase):
                     kwargs={'slug': another_group.slug})
         )
         self.assertNotIn(self.post, response.context['page_obj'])
+
+    def test_index_page_cache(self):
+        """ Кеширование posts_app:main работатет. """
+        cache.clear()
+        post = Post.objects.create(
+            text='Тестовый пост',
+            author=self.author_user,
+            group=self.group
+        )
+        content_add = self.authorized_client.get(
+            reverse('posts_app:main')).content
+        post.delete()
+        content_delete = self.authorized_client.get(
+            reverse('posts_app:main')).content
+        self.assertEqual(content_add, content_delete)
+        cache.clear()
+        content_cache_clear = self.authorized_client.get(
+            reverse('posts_app:main')).content
+        self.assertNotEqual(content_add, content_cache_clear)
 
 
 class PaginatorViewsTest(TestCase):
@@ -210,6 +231,7 @@ class PaginatorViewsTest(TestCase):
         Post.objects.bulk_create(cls.posts)
 
     def test_first_page_contains_ten_records(self):
+        cache.clear()
         """Проверяем количество постов на страницах Main, group_list, profile
         равно 10."""
         urls = (
@@ -241,3 +263,6 @@ class PaginatorViewsTest(TestCase):
             response = self.client.get(url)
             amount_posts = len(response.context.get('page_obj').object_list)
             self.assertEqual(amount_posts, self.posts_per_second_page)
+
+
+

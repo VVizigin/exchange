@@ -1,24 +1,47 @@
+import shutil
+import tempfile
+
 from http import HTTPStatus
 
 from django.test import (
     Client,
     TestCase,
+    override_settings
 )
 from django.urls import reverse
+from django.conf import settings
+from django.core.files.uploadedfile import SimpleUploadedFile
+
 
 from ..models import (
+    Comment,
     Group,
     Post,
     User
 )
 
+TEMP_MEDIA_ROOT = tempfile.mkdtemp(dir=settings.BASE_DIR)
 
+
+@override_settings(MEDIA_ROOT=TEMP_MEDIA_ROOT)
 class PostCreateFormTests(TestCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
         cls.author_user = User.objects.create_user(username='TestUserAuthor')
         cls.auth_user = User.objects.create_user(username='TestUserAuth')
+        small_gif = (
+            b'\x47\x49\x46\x38\x39\x61\x02\x00'
+            b'\x01\x00\x80\x00\x00\x00\x00\x00'
+            b'\xFF\xFF\xFF\x21\xF9\x04\x00\x00'
+            b'\x00\x00\x00\x2C\x00\x00\x00\x00'
+            b'\x02\x00\x01\x00\x00\x02\x02\x0C'
+            b'\x0A\x00\x3B'
+        )
+        cls.uploaded = SimpleUploadedFile(
+            name='small.gif',
+            content=small_gif,
+            content_type='image/gif')
         cls.group = Group.objects.create(
             title='Тестовая группа',
             slug='test-slug',
@@ -26,6 +49,12 @@ class PostCreateFormTests(TestCase):
         )
         cls.form_text = 'Введенный в форму текст'
         cls.form_text_replace = 'Отредактированный в форме текст'
+        cls.comment_text = 'Текст комментария'
+
+    @classmethod
+    def tearDownClass(cls):
+        super().tearDownClass()
+        shutil.rmtree(TEMP_MEDIA_ROOT, ignore_errors=True)
 
     def setUp(self):
         self.author_client = Client()
@@ -178,4 +207,76 @@ class PostCreateFormTests(TestCase):
         )
         check_post = Post.objects.get(pk=post.id)
         self.assertEqual(check_post, post)
+
+    def test_creating_post_with_image(self):
+        """Проверяем, пост с картинкой через форму PostForm,
+        создаётся запись в базе данных"""
+        post_count = Post.objects.count()
+        form_data = {
+            'text': self.form_text,
+            'group': self.group.pk,
+            'image': self.uploaded
+        }
+        response = self.author_client.post(
+            reverse('posts_app:post_create'),
+            data=form_data,
+            follow=True
+        )
+        self.assertRedirects(
+            response,
+            reverse(
+                'posts_app:profile',
+                kwargs={'username': self.author_user.username}
+            )
+        )
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        self.assertEqual(Post.objects.count(), post_count + 1)
+
+    def test_authorized_user_create_comment(self):
+        """Проверка создания комментария авторизированным клиентом."""
+        comments_count = Comment.objects.count()
+        post = Post.objects.create(
+            text=self.form_text,
+            author=self.author_user,
+        )
+        form_data = {
+            'text': self.comment_text,
+            'post': post.pk
+        }
+        response = self.auth_client.post(
+            reverse(
+                'posts_app:add_comment', kwargs={'post_id': post.pk}),
+            data=form_data,
+            follow=True
+        )
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        self.assertEqual(Comment.objects.count(), comments_count + 1)
+        comment_one = Comment.objects.latest('id')
+        self.assertEqual(comment_one.text, self.comment_text)
+        self.assertEqual(comment_one.author, self.auth_user)
+
+    def test_guest_user_create_comment(self):
+        """Проверка создания комментария авторизированным клиентом."""
+        comments_count = Comment.objects.count()
+        post = Post.objects.create(
+            text=self.form_text,
+            author=self.author_user,
+        )
+        form_data = {
+            'text': self.comment_text,
+            'post': post.pk
+        }
+        response = self.guest_client.post(
+            reverse(
+                'posts_app:add_comment', kwargs={'post_id': post.pk}),
+            data=form_data,
+            follow=True
+        )
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        self.assertEqual(Comment.objects.count(), comments_count)
+
+
+
+
+
 

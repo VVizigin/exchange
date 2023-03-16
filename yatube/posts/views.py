@@ -1,8 +1,11 @@
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.shortcuts import render, get_object_or_404, redirect
-from .forms import PostForm
-from .models import Post, Group, User
+
+from .forms import PostForm, CommentForm
+from .models import Post, Group, User, Follow
+from django.views.decorators.cache import cache_page
+
 
 POSTS_PER_PAGE = 10
 
@@ -13,6 +16,7 @@ def get_paginator(items_list, request, page_param='page'):
     return paginator.get_page(page_number)
 
 
+@cache_page(20, key_prefix='index_page')
 def index(request):
     page_obj = get_paginator(Post.objects.all(), request)
     context = {
@@ -35,19 +39,42 @@ def group_list(request, slug):
 def profile(request, username):
     author = get_object_or_404(User, username=username)
     page_obj = get_paginator(author.posts.all(), request)
+    following = request.user
+    if request.user.is_authenticated:
+        following = Follow.objects.filter(
+            author=author,
+            user=request.user
+        ).exists()
     context = {
         "page_obj": page_obj,
         "author": author,
+        "following": following
     }
     return render(request, 'posts/profile.html', context)
 
 
 def post_detail(request, post_id):
     post = get_object_or_404(Post, pk=post_id)
+    comments = post.comments.all()
+    form = CommentForm()
     context = {
         "post": post,
+        'comments': comments,
+        'form': form,
     }
     return render(request, 'posts/post_detail.html', context)
+
+
+@login_required
+def add_comment(request, post_id):
+    post = get_object_or_404(Post, pk=post_id)
+    form = CommentForm(request.POST or None)
+    if form.is_valid():
+        comment = form.save(commit=False)
+        comment.author = request.user
+        comment.post = post
+        comment.save()
+    return redirect('posts_app:post_detail', post_id=post_id)
 
 
 @login_required
@@ -81,3 +108,28 @@ def post_create(request):
         return redirect('posts_app:profile', request.user)
     context = {"form": form}
     return render(request, 'posts/post_create.html', context)
+
+
+@login_required
+def follow_index(request):
+    posts = Post.objects.filter(
+        author__following__user=request.user)
+    paginator = Paginator(posts, POSTS_PER_PAGE)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    context = {
+        "page_obj": page_obj
+    }
+    return render(request, 'posts/follow.html', context)
+
+
+@login_required
+def profile_follow(request, username):
+    # Подписаться на автора
+    ...
+
+
+@login_required
+def profile_unfollow(request, username):
+    # Дизлайк, отписка
+    ...

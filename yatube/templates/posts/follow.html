@@ -1,0 +1,14 @@
+{% extends 'base.html' %}
+{% load thumbnail %}
+
+{% block title %}
+  Подписки
+{% endblock %}
+
+{% block content %}
+  <h1>Следуй за мной</h1>
+  {% for post in page_obj %}
+    {% include "posts/post_info.html" with show_link=True %}
+  {% endfor %}
+  {% include 'posts/includes/paginator.html' %}
+{% endblock %}

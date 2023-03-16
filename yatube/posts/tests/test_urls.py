@@ -4,6 +4,7 @@ from django.test import (
     TestCase,
     Client
 )
+from django.core.cache import cache
 
 from ..models import (
     Post,
@@ -96,6 +97,7 @@ class PostURLTests(TestCase):
 
     def test_urls_uses_correct_template(self):
         """Проверяем, что URL-адрес использует соответствующий шаблон."""
+        cache.clear()
         templates_url_names = [
             {
                 'template': 'posts/index.html',
