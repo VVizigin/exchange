@@ -1,17 +1,15 @@
 import shutil
 import tempfile
-
 from http import HTTPStatus
 
+from django.conf import settings
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import (
     Client,
     TestCase,
     override_settings
 )
 from django.urls import reverse
-from django.conf import settings
-from django.core.files.uploadedfile import SimpleUploadedFile
-
 
 from ..models import (
     Comment,
@@ -231,6 +229,15 @@ class PostCreateFormTests(TestCase):
         )
         self.assertEqual(response.status_code, HTTPStatus.OK)
         self.assertEqual(Post.objects.count(), post_count + 1)
+        post_one = Post.objects.latest('id')
+        self.assertEqual(post_one.text, self.form_text)
+        self.assertEqual(post_one.group, self.group)
+        # self.assertEqual(post_one.image, self.uploaded.file)
+        self.assertTrue(Post.objects.filter(
+            text=self.form_text,
+            group=self.group,
+            # image='posts/small.gif'
+        ).exists())
 
     def test_authorized_user_create_comment(self):
         """Проверка создания комментария авторизированным клиентом."""
@@ -253,6 +260,7 @@ class PostCreateFormTests(TestCase):
         self.assertEqual(Comment.objects.count(), comments_count + 1)
         comment_one = Comment.objects.latest('id')
         self.assertEqual(comment_one.text, self.comment_text)
+        self.assertEqual(comment_one.post, post)
         self.assertEqual(comment_one.author, self.auth_user)
 
     def test_guest_user_create_comment(self):
@@ -274,9 +282,3 @@ class PostCreateFormTests(TestCase):
         )
         self.assertEqual(response.status_code, HTTPStatus.OK)
         self.assertEqual(Comment.objects.count(), comments_count)
-
-
-
-
-
-

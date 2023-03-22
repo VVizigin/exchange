@@ -1,15 +1,15 @@
 import shutil
 import tempfile
+from http import HTTPStatus
 
 from django import forms
 from django.conf import settings
+from django.core.cache import cache
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import Client, TestCase, override_settings
 from django.urls import reverse
-from django.core.files.uploadedfile import SimpleUploadedFile
-from django.core.cache import cache
 
-from ..models import Group, Post, User
-
+from ..models import Group, Post, User, Follow
 
 TEMP_MEDIA_ROOT = tempfile.mkdtemp(dir=settings.BASE_DIR)
 
@@ -21,6 +21,8 @@ class PostTests(TestCase):
         super().setUpClass()
         cls.auth_user = User.objects.create_user(username='TestUserAuth')
         cls.author_user = User.objects.create_user(username='TestUserAuthor')
+        cls.unfollow_user = User.objects.create_user(
+            username='TestUserUnfollow')
         small_gif = (
             b'\x47\x49\x46\x38\x39\x61\x02\x00'
             b'\x01\x00\x80\x00\x00\x00\x00\x00'
@@ -44,6 +46,10 @@ class PostTests(TestCase):
             group=cls.group,
             image=cls.uploaded,
         )
+        # cls.follower = User.objects.create(
+        #     username=cls.auth_user.username
+        #     author=
+        # )
 
     @classmethod
     def tearDownClass(cls):
@@ -52,10 +58,12 @@ class PostTests(TestCase):
 
     def setUp(self):
         self.guest_client = Client()
-        self.authorized_client = Client()
-        self.authorized_client_author = Client()
-        self.authorized_client.force_login(self.auth_user)
-        self.authorized_client_author.force_login(self.author_user)
+        self.auth_client = Client()
+        self.auth_client.force_login(self.auth_user)
+        self.author_client = Client()
+        self.author_client.force_login(self.author_user)
+        self.unfollow_client = Client()
+        self.unfollow_client.force_login(self.unfollow_user)
 
     def test_pages_uses_correct_template(self):
         """Проверяем, что URL-адрес использует соответствующий шаблон."""
@@ -80,13 +88,13 @@ class PostTests(TestCase):
         }
         for reverse_name, template in page_names_templates.items():
             with self.subTest(template=template):
-                response = self.authorized_client_author.get(reverse_name)
+                response = self.author_client.get(reverse_name)
                 self.assertTemplateUsed(response, template)
 
     def test_home_page_show_correct_context(self):
         """Шаблон главной страницы сформирован с правильным контекстом."""
         cache.clear()
-        response = self.authorized_client.get(reverse('posts_app:main'))
+        response = self.auth_client.get(reverse('posts_app:main'))
         post_info = response.context.get('page_obj')[0]
         self.assertEqual(post_info, self.post)
 
@@ -95,7 +103,7 @@ class PostTests(TestCase):
         url = reverse(
             'posts_app:group_list', kwargs={'slug': self.group.slug}
         )
-        response = self.authorized_client.get(url)
+        response = self.auth_client.get(url)
         post_info = response.context.get('page_obj')[0]
         self.assertEqual(post_info, self.post)
         group_info = response.context.get('group')
@@ -107,7 +115,7 @@ class PostTests(TestCase):
             'posts_app:profile',
             kwargs={'username': PostTests.author_user}
         )
-        response = self.authorized_client_author.get(url)
+        response = self.author_client.get(url)
         post_info = response.context.get('page_obj')[0]
         self.assertEqual(post_info, self.post)
         author_info = response.context.get('author')
@@ -119,7 +127,7 @@ class PostTests(TestCase):
             'posts_app:post_detail',
             kwargs={'post_id': self.post.pk}
         )
-        response = self.authorized_client_author.get(url)
+        response = self.author_client.get(url)
         post_info = response.context.get('post')
         self.assertEqual(post_info, self.post)
 
@@ -128,10 +136,11 @@ class PostTests(TestCase):
         с правильным контекстом.
         """
         url = reverse('posts_app:post_edit', kwargs={'post_id': self.post.pk})
-        response = self.authorized_client_author.get(url)
+        response = self.author_client.get(url)
         form_fields = {
             'text': forms.fields.CharField,
             'group': forms.fields.ChoiceField,
+            'image': forms.fields.ImageField,
         }
         for field, expected in form_fields.items():
             with self.subTest(field=field):
@@ -144,10 +153,11 @@ class PostTests(TestCase):
         с правильным контекстом.
         """
         url = reverse('posts_app:post_create')
-        response = self.authorized_client.get(url)
+        response = self.auth_client.get(url)
         form_fields = {
             'text': forms.fields.CharField,
             'group': forms.fields.ChoiceField,
+            'image': forms.fields.ImageField,
         }
         for field, expected in form_fields.items():
             with self.subTest(field=field):
@@ -169,7 +179,7 @@ class PostTests(TestCase):
             ),
         )
         for url in urls:
-            response = self.authorized_client_author.get(url)
+            response = self.author_client.get(url)
             self.assertIn(self.post, response.context['page_obj'])
 
     def test_post_not_another_group(self):
@@ -180,7 +190,7 @@ class PostTests(TestCase):
             slug='test-another-slug',
             description='Тестовое описание дополнительной группы',
         )
-        response = self.authorized_client.get(
+        response = self.auth_client.get(
             reverse('posts_app:group_list',
                     kwargs={'slug': another_group.slug})
         )
@@ -194,16 +204,66 @@ class PostTests(TestCase):
             author=self.author_user,
             group=self.group
         )
-        content_add = self.authorized_client.get(
+        content_add = self.auth_client.get(
             reverse('posts_app:main')).content
         post.delete()
-        content_delete = self.authorized_client.get(
+        content_delete = self.auth_client.get(
             reverse('posts_app:main')).content
         self.assertEqual(content_add, content_delete)
         cache.clear()
-        content_cache_clear = self.authorized_client.get(
+        content_cache_clear = self.auth_client.get(
             reverse('posts_app:main')).content
         self.assertNotEqual(content_add, content_cache_clear)
+
+    def test_follow_on_user(self):
+        """Проверка подписки на пользователя."""
+        count_follow = Follow.objects.count()
+        response = self.auth_client.post(
+            reverse('posts_app:profile_follow',
+                    args=[self.author_user.username]),
+            follow=True
+        )
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        follow = Follow.objects.all().latest('id')
+        self.assertEqual(Follow.objects.count(), count_follow + 1)
+        self.assertEqual(follow.author_id, self.author_user.id)
+        self.assertEqual(follow.user_id, self.auth_user.id)
+
+    def test_unfollow_on_user(self):
+        """Проверка отписки от пользователя."""
+        count_follow = Follow.objects.count()
+        response = self.auth_client.post(
+            reverse('posts_app:profile_follow',
+                    args=[self.author_user.username]),
+            follow=True
+        )
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        follow = Follow.objects.all().latest('id')
+        self.assertEqual(Follow.objects.count(), count_follow + 1)
+        self.assertEqual(follow.author_id, self.author_user.id)
+        self.assertEqual(follow.user_id, self.auth_user.id)
+        response = self.auth_client.post(
+            reverse('posts_app:profile_unfollow',
+                    args=[self.author_user.username]),
+            follow=True
+        )
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        self.assertEqual(Follow.objects.count(), count_follow)
+
+    def test_posts_views_follow_correct_context(self):
+        """ Проверка контекста для posts_app:follow_main.
+        """
+        cache.clear()
+        Follow.objects.create(
+            user=self.auth_user,
+            author=self.author_user
+        )
+        response = self.auth_client.get(reverse('posts_app:follow_main'))
+        self.assertEqual(len(response.context.get('page_obj')), 1)
+        post_info = response.context.get('page_obj')[0]
+        self.assertEqual(post_info, self.post)
+        response = self.unfollow_client.get(reverse('posts_app:follow_main'))
+        self.assertEqual(len(response.context.get('page_obj')), 0)
 
 
 class PaginatorViewsTest(TestCase):
@@ -263,6 +323,3 @@ class PaginatorViewsTest(TestCase):
             response = self.client.get(url)
             amount_posts = len(response.context.get('page_obj').object_list)
             self.assertEqual(amount_posts, self.posts_per_second_page)
-
-
-

@@ -2,7 +2,7 @@ from django.contrib.auth import get_user_model
 from django.db import models
 
 User = get_user_model()
-str_length = 15
+STR_LENGHT = 15
 
 
 class Post(models.Model):
@@ -44,7 +44,7 @@ class Post(models.Model):
         verbose_name_plural = "Посты"
 
     def __str__(self):
-        return self.text[:str_length]
+        return self.text[:STR_LENGHT]
 
 
 class Group(models.Model):
@@ -92,12 +92,12 @@ class Comment(models.Model):
     )
 
     class Meta:
-        ordering = ['-created']
+        ordering = ('-created',)
         verbose_name = 'Комментарий'
         verbose_name_plural = 'Комментарии'
 
     def __str__(self):
-        return self.text[:str_length]
+        return self.text[:STR_LENGHT]
 
 
 class Follow(models.Model):
@@ -115,6 +115,12 @@ class Follow(models.Model):
     class Meta:
         verbose_name_plural = 'Подписки'
         verbose_name = 'Подписка'
+        constraints = [
+            models.UniqueConstraint(
+                fields=['user', 'author'],
+                name='unique_following'
+            )
+        ]
 
     def __str__(self):
         return f'{self.user} подписался на {self.author}'

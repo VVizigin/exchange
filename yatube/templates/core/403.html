@@ -1,0 +1,6 @@
+{% extends "base.html" %}
+{% block title %}Ошибка 403{% endblock %}
+{% block content %}
+    <h1>Страница запрещена к просмотру, войдите в систему</h1>
+    <a href="{% url 'posts_app:main' %}">Вернуться на главную страницу</a>
+{% endblock %}
